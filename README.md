@@ -35,3 +35,73 @@ The demo does not implement logins, operator roles, competing-manager arbitratio
 ## Version
 
 V10 adds adjustable physical site dimensions to the v9 design. The dark/orange/white workbench, detached glass-like fleet, task-button treatment and scene transitions are retained.
+
+## 3D splat / intermittent mesh experiment
+
+Branch: `feat/3d-splat-mesh`. Open `index.html` as before; the new panel is below
+its original map. No dependencies, CDN, network calls or build step were added.
+
+1. Watch the 3D robots follow the existing routes. Drag the 3D view to orbit,
+   scroll to zoom, and select a machine in the original fleet list.
+2. Use **Download sample**, then **Import .splat**, or import the included
+   `data/exowatt-site.splat` (490 synthetic Gaussians, 15,680 bytes).
+3. Increase band radius to 280 m for an immediate connected demonstration.
+   Cut HQ uplink: machines keep moving, discovering and exchanging tiles while
+   HQ's inventory stops growing. Restore it to drain buffered tiles from robots
+   in HQ range. Lower radius to demonstrate isolated components and later encounters.
+4. Enable **Selected unit's map only** to see the tiles that machine knows.
+   The default view shows simulation ground truth, including disconnected units;
+   the original console still shows last-known telemetry when its link is dropped.
+
+### Representation and protocol
+
+The importer supports the common 32-byte binary `.splat` layout: little-endian
+float32 XYZ (12 bytes), positive float32 axis scales (12), uint8 RGBA (4), then
+uint8 quaternion WXYZ (4), decoded as `(byte - 128) / 128` and normalized.
+It rejects empty, incomplete, non-finite, non-positive-scale, zero-quaternion and
+oversized input. Maximum: 20,000 splats / 640 KB. PLY and compressed splat formats
+are not supported. A failed import retains the previous scene. Coordinates must
+already be in the site's shared local metre frame (X east, Y north, Z up).
+The renderer projects quaternion-rotated Gaussian covariance onto an orbitable
+orthographic Canvas 2D view, sorts by depth, and alpha-blends soft ellipses. This
+is a small CPU visualization, not a photorealistic GPU 3DGS renderer.
+
+Splats are partitioned into immutable 80 m XY tiles. Every four simulated seconds,
+a robot observes tiles with centroids within 95 m. Initial inventories include at
+most one nearby tile. Robots retain all observed/received tiles for this session.
+Each second, overlapping bands exchange at most one missing tile per direction,
+using inventories from the start of the round to enforce relay delay. Duplicate
+tiles are suppressed by tile ID. HQ receives at most one missing tile per in-range
+robot per second while uplink is enabled. Byte totals count 32-byte Gaussian payloads
+per successful delivery, including relay copies; they exclude protocol overhead.
+
+The rings are a deliberately idealized connectivity model: peer links exist at
+separation ≤ twice the selected radius; HQ's range is one radius. These are
+illustrative bands, not calibrated antenna coverage. Map transfers and acknowledgments
+are simulated inventory updates; there is no actual radio, socket transport, packet
+loss, authentication, SLAM alignment, map revision conflict resolution, obstacle
+attenuation, disk persistence or restart recovery. Existing mission/autonomy behavior
+is unchanged. Importing a map resets inventories; resizing the original site moves
+robots but does not rescale imported metric geometry.
+
+### Research basis
+
+The supplied reading notes motivate geometry sharing, intermittent encounters and
+store-carry-forward reporting, particularly **ACHORD: Communication-Aware Multi-Robot
+Coordination With Intermittent Connectivity** (2022),
+https://ai.jpl.nasa.gov/public/documents/papers/saboia-et-al-rss2022.pdf.
+The notes also cite **What is the best 3D scene representation for robotics?**,
+**GSRF**, **RadCloudSplat**, and **PropEM-L**. These are design inspirations supplied
+by the team, not independently reproduced or validated results. RF Gaussian models
+predict/synthesize radio fields; they do not themselves provide a map-transfer
+protocol. This demo implements neither their RF models nor their reported accuracy.
+A next implementation could replace the range predicate with measured link quality,
+and put versioned tile manifests, chunk checksums and resumable acknowledgments over
+a real local transport.
+
+### Validation
+
+Run `node --test tests/splat.test.cjs` (Node 18+). Tests exercise hop latency,
+duplicate suppression, range boundaries, offline retention, HQ recovery, and binary
+validation. Browser smoke checks use the installed Playwright and Chromium against
+a local HTTP server; no server is required for normal saved-file use.

@@ -330,6 +330,7 @@ let updateTimer = 0;
 function tick(dt) {
   simTime += dt;
   entities.forEach(e => stepEntity(e, dt));
+  window.splatDemo?.step(dt);
 
   // Position updates + command state machine step once per second, per unit
   updateTimer += dt;
@@ -834,6 +835,7 @@ function frame(now) {
   stepCamera(now);
   drawMap();
   drawEntities();
+  window.splatDemo?.draw();
   if (canvas.width > 0 && canvas.height > 0) {
     canvas.style.opacity="1"; document.getElementById("mapFallback").style.display="none";
     const s=document.getElementById("startup");s.className="startup running";s.textContent="Simulation running · select a unit to command it";
@@ -858,6 +860,116 @@ refreshList();
 refreshDetail();
 refreshHeader();
 requestAnimationFrame(frame);
+</script>
+<script>
+/* Splat mesh demo: no network, library or build dependency. */
+class SplatMesh {
+  constructor(ids, chunks) {
+    this.ids=ids; this.chunks=chunks; this.maps=new Map(ids.map(id=>[id,new Set()]));
+    this.hq=new Set(); this.links=[]; this.bytes=0; this.clock=0; this.scanClock=0;
+    this.uplink=true; this.range=140; this.events=[];
+  }
+  event(message){this.events.unshift(message);this.events.length=Math.min(6,this.events.length);}
+  step(dt,bots,hq){
+    this.links=[];
+    for(let i=0;i<bots.length;i++)for(let j=i+1;j<bots.length;j++){
+      if(Math.hypot(bots[i].x-bots[j].x,bots[i].y-bots[j].y)<=2*this.range)
+        this.links.push([bots[i].id,bots[j].id]);
+    }
+    this.scanClock+=dt;this.clock+=dt;
+    if(this.scanClock>=4){
+      this.scanClock%=4;
+      for(const b of bots)for(const chunk of this.chunks){
+        if(Math.hypot(b.x-chunk.x,b.y-chunk.y)<95)this.maps.get(b.id).add(chunk.id);
+      }
+    }
+    // One immutable chunk per link per second in each direction. Snapshot first:
+    // a chunk received in this round cannot teleport across multiple hops.
+    if(this.clock<1)return;this.clock%=1;
+    const before=new Map([...this.maps].map(([id,set])=>[id,new Set(set)]));
+    for(const [a,b] of this.links)for(const [from,to] of [[a,b],[b,a]]){
+      const chunk=this.chunks.find(c=>before.get(from).has(c.id)&&!this.maps.get(to).has(c.id));
+      if(chunk){this.maps.get(to).add(chunk.id);this.bytes+=chunk.bytes;this.event(`${from} → ${to}: ${chunk.id}`);}
+    }
+    if(this.uplink)for(const b of bots){
+      if(Math.hypot(b.x-hq.x,b.y-hq.y)>this.range)continue;
+      const chunk=this.chunks.find(c=>this.maps.get(b.id).has(c.id)&&!this.hq.has(c.id));
+      if(chunk){this.hq.add(chunk.id);this.bytes+=chunk.bytes;this.event(`${b.id} → HQ: ${chunk.id}`);}
+    }
+  }
+}
+function parseSplat(buffer){
+  if(!buffer.byteLength||buffer.byteLength%32||buffer.byteLength>32*20000)throw Error('Use a 32-byte-record .splat file with 1–20,000 splats (maximum 640 KB).');
+  const v=new DataView(buffer), points=[];
+  for(let o=0;o<buffer.byteLength;o+=32){
+    const p={x:v.getFloat32(o,true),y:v.getFloat32(o+4,true),z:v.getFloat32(o+8,true),s:[12,16,20].map(k=>v.getFloat32(o+k,true)),c:[24,25,26,27].map(k=>v.getUint8(o+k)),q:[28,29,30,31].map(k=>(v.getUint8(o+k)-128)/128)};
+    if(![p.x,p.y,p.z,...p.s].every(Number.isFinite)||p.s.some(x=>x<=0)||Math.hypot(...p.q)<.01)throw Error('Invalid position, scale or quaternion in splat file.');
+    points.push(p);
+  }
+  return points;
+}
+// Test exports are inert in browsers; production remains one self-contained HTML.
+if(typeof module!=='undefined')module.exports={SplatMesh,parseSplat};
+if(typeof document!=='undefined'){
+ const style=document.createElement('style');style.textContent=`
+ .splat-panel{border-top:1px solid #37393e;background:#11171b;padding:16px 20px}.splat-panel h3{font-size:13px;margin:0 0 10px}.splat-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:11px}.splat-tools button,.splat-tools label{font-size:11px}.splat-stage{height:360px;position:relative;margin-top:12px;border:1px solid #303c43;border-radius:6px;overflow:hidden}.splat-stage canvas{position:static;display:block;touch-action:none}.splat-panel p{font-size:11px;color:#aebcc4;line-height:1.6;margin:9px 0}.splat-report{display:flex;gap:14px;flex-wrap:wrap;font:11px monospace;color:#9de6ce}.splat-log{font:10px monospace;color:#aab8c1;min-height:36px;line-height:1.6}.splat-panel input[type=range]{width:110px}.splat-panel input[type=file]{max-width:230px;font-size:11px}.splat-panel input{accent-color:#83dcca}`;document.head.append(style);
+ const panel=document.createElement('section');panel.className='splat-panel';panel.innerHTML=`
+ <h3>3D world / store · carry · forward</h3>
+ <div class="splat-tools"><label>Import .splat <input id="splatFile" type="file" accept=".splat" aria-describedby="splatStatus"></label><button id="splatSample">Download sample</button><button id="splatHQ" aria-pressed="false">Cut HQ uplink</button><label>Band radius <input id="splatRange" type="range" min="40" max="280" step="10" value="140"> <output id="splatRadius">140 m</output></label><label><input id="splatKnown" type="checkbox"> Selected unit's map only</label></div>
+ <p id="splatStatus" role="status">Synthetic Gaussian site loaded. Drag to orbit · wheel to zoom. Shared local frame: X east, Y north, Z up, metres.</p>
+ <div class="splat-stage"><canvas id="splatCanvas" aria-label="Orbitable 3D splat site with moving robots and simulated communication bands"></canvas></div>
+ <p>Simulation ground truth · mint links indicate overlapping bands (distance ≤ 2 × radius). One map chunk per second per direction. HQ receives buffered chunks within one radius when its uplink is available. Orange units have a dropped console link; peer exchange continues.</p>
+ <div class="splat-report" id="splatReport"></div><p id="splatInventory"></p><div class="splat-log" id="splatLog" aria-live="off"></div>`;
+ document.querySelector('.map-bottom').before(panel);
+ const cv=document.getElementById('splatCanvas'),g=cv.getContext('2d');
+ let points=[],chunks=[],mesh,yaw=-.65,zoom=1,pitch=.65,drag=null;
+ const bots=()=>entities.filter(e=>e.type!=='human');
+ function install(next,name){
+   points=next;const buckets=new Map();
+   for(const p of points){const key=`tile ${Math.floor(p.x/80)},${Math.floor(p.y/80)}`;if(!buckets.has(key))buckets.set(key,[]);buckets.get(key).push(p);p.chunk=key;}
+   chunks=[...buckets].map(([id,ps])=>({id,x:ps.reduce((a,p)=>a+p.x,0)/ps.length,y:ps.reduce((a,p)=>a+p.y,0)/ps.length,bytes:ps.length*32}));
+   const old=mesh;mesh=new SplatMesh(bots().map(b=>b.id),chunks);if(old){mesh.range=old.range;mesh.uplink=old.uplink;}
+   // Seed the closest observed tile to each machine, then discover by proximity.
+   for(const b of bots()){const near=[...chunks].sort((a,c)=>Math.hypot(a.x-b.x,a.y-b.y)-Math.hypot(c.x-b.x,c.y-b.y))[0];if(near&&Math.hypot(near.x-b.x,near.y-b.y)<95)mesh.maps.get(b.id).add(near.id);}
+   document.getElementById('splatStatus').textContent=`${name}: ${points.length.toLocaleString()} Gaussians / ${chunks.length} immutable tiles. Import resets map inventories. Drag to orbit · wheel to zoom.`;
+ }
+ const synthetic=[];
+ for(const [x,y] of [[100,300],[180,300],[260,300],[480,300],[560,300],[640,300],[100,60],[180,60],[260,60],[340,60]])for(let i=0;i<8;i++)for(let j=0;j<5;j++)synthetic.push({x:x+i*7,y:y+j*7,z:8+i*.65,s:[4,3,1.5],c:[90,160+i*6,180,205],q:[1,0,0,0]});
+ for(let i=0;i<90;i++)synthetic.push({x:40+i*8,y:260,z:1,s:[4,7,1],c:[150,135,110,125],q:[1,0,0,0]});
+ install(synthetic,'Synthetic site');
+ function project(x,y,z){const a=(x-SITE.w/2)*Math.cos(yaw)-(y-SITE.h/2)*Math.sin(yaw),b=(x-SITE.w/2)*Math.sin(yaw)+(y-SITE.h/2)*Math.cos(yaw);return [cv.clientWidth/2+a*scale,cv.clientHeight/2+(b*Math.sin(pitch)-z*Math.cos(pitch))*scale,b*Math.cos(pitch)+z*Math.sin(pitch)];}
+ let scale=1;
+ function path(ps,color,width=1,close=false){g.beginPath();ps.forEach((p,i)=>{const q=project(...p);i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]);});if(close)g.closePath();g.strokeStyle=color;g.lineWidth=width;g.stroke();}
+ function ring(b,r,color){const ps=[];for(let i=0;i<=64;i++){const a=i/64*Math.PI*2;ps.push([b.x+Math.cos(a)*r,b.y+Math.sin(a)*r,2]);}path(ps,color);const a=simTime*.7;path([[b.x+Math.cos(a)*r,b.y+Math.sin(a)*r,2],[b.x+Math.cos(a+.25)*r,b.y+Math.sin(a+.25)*r,2]],color,3);}
+ function draw(){
+   const w=cv.parentElement.clientWidth,h=cv.parentElement.clientHeight,dpr=Math.min(devicePixelRatio||1,2);if(cv.width!==Math.round(w*dpr)||cv.height!==Math.round(h*dpr)){cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);}g.setTransform(dpr,0,0,dpr,0,0);g.fillStyle='#11171b';g.fillRect(0,0,w,h);scale=Math.min(w/(SITE.w*1.5),h/(SITE.h*1.25))*zoom;
+   for(let x=0;x<=SITE.w;x+=100)path([[x,0,0],[x,SITE.h,0]],'#24323a');for(let y=0;y<=SITE.h;y+=100)path([[0,y,0],[SITE.w,y,0]],'#24323a');
+   const known=mesh.maps.get(selectedId)||new Set(),only=document.getElementById('splatKnown').checked;
+   // Orthographic covariance projection: quaternion rotates each Gaussian's axes.
+   const sorted=points.filter(p=>!only||known.has(p.chunk)).map(p=>({p,q:project(p.x,p.y,p.z)})).sort((a,b)=>a.q[2]-b.q[2]);
+   for(const {p,q} of sorted){
+     let [qw,qx,qy,qz]=p.q;const n=Math.hypot(...p.q);qw/=n;qx/=n;qy/=n;qz/=n;
+     const axes=[[1-2*(qy*qy+qz*qz),2*(qx*qy+qw*qz),2*(qx*qz-qw*qy)],[2*(qx*qy-qw*qz),1-2*(qx*qx+qz*qz),2*(qy*qz+qw*qx)],[2*(qx*qz+qw*qy),2*(qy*qz-qw*qx),1-2*(qx*qx+qy*qy)]];
+     let a=0,b=0,c=0;axes.forEach((v,i)=>{const t=project(p.x+v[0]*p.s[i],p.y+v[1]*p.s[i],p.z+v[2]*p.s[i]),u=t[0]-q[0],v2=t[1]-q[1];a+=u*u;b+=u*v2;c+=v2*v2;});
+     const disc=Math.sqrt((a-c)**2+4*b*b),rx=Math.max(.5,Math.sqrt((a+c+disc)/2)),ry=Math.max(.5,Math.sqrt(Math.max(0,(a+c-disc)/2)));
+     g.save();g.translate(q[0],q[1]);g.rotate(.5*Math.atan2(2*b,a-c));g.scale(rx*2,ry*2);const grad=g.createRadialGradient(0,0,0,0,0,1);grad.addColorStop(0,`rgba(${p.c.slice(0,3)},${p.c[3]/255*.7})`);grad.addColorStop(1,`rgba(${p.c.slice(0,3)},0)`);g.fillStyle=grad;g.fillRect(-1,-1,2,2);g.restore();
+   }
+   const bs=bots(),hq={x:75*SITE.w/800,y:450*SITE.h/500};
+   ring(hq,mesh.range,mesh.uplink?'#7394ba66':'#f15b3555');
+   for(const [a,b] of mesh.links){const p=bs.find(x=>x.id===a),q=bs.find(x=>x.id===b);path([[p.x,p.y,p.alt||5],[q.x,q.y,q.alt||5]],'#83dcca88',2);}
+   for(const b of bs){ring(b,mesh.range,'#83dcca44');const z=b.alt||6,q=project(b.x,b.y,z);path([[b.x,b.y,0],[b.x,b.y,z]],'#69808a');g.fillStyle=b.connected?'#d7eee7':'#f39a65';g.fillRect(q[0]-5,q[1]-4,10,8);if(b.type==='drone'){for(const dx of [-8,8])for(const dy of [-6,6]){g.beginPath();g.ellipse(q[0]+dx,q[1]+dy,5,2,simTime*12,0,Math.PI*2);g.strokeStyle='#a5c2d9';g.stroke();}}else{g.fillStyle='#6e8790';g.fillRect(q[0]-7,q[1]+4,14,3);}g.fillStyle='#e4ecef';g.font='10px monospace';g.fillText(b.id,q[0]+9,q[1]-8);if(b.id===selectedId){g.strokeStyle='#f39a65';g.strokeRect(q[0]-11,q[1]-10,22,20);}}
+   const hp=project(hq.x,hq.y,2);g.fillStyle=mesh.uplink?'#9cbbde':'#f39a65';g.fillText('HQ '+(mesh.uplink?'ONLINE':'BUFFERING'),hp[0],hp[1]);
+ }
+ let reportClock=0;
+ window.splatDemo={step(dt){mesh.step(dt,bots(),{x:75*SITE.w/800,y:450*SITE.h/500});reportClock+=dt;},draw(){draw();if(reportClock>.3){reportClock=0;document.getElementById('splatReport').textContent=`${mesh.links.length} peer links · ${mesh.hq.size}/${chunks.length} tiles at HQ · ${(mesh.bytes/1024).toFixed(1)} KiB transferred`;document.getElementById('splatInventory').textContent=bots().map(b=>`${b.id}: ${mesh.maps.get(b.id).size}/${chunks.length}`).join(' · ');document.getElementById('splatLog').textContent=mesh.events.slice(0,3).join(' | ');}},get mesh(){return mesh;}};
+ document.getElementById('splatHQ').onclick=e=>{mesh.uplink=!mesh.uplink;e.target.textContent=mesh.uplink?'Cut HQ uplink':'Restore HQ uplink';e.target.setAttribute('aria-pressed',String(!mesh.uplink));};
+ document.getElementById('splatRange').oninput=e=>{mesh.range=+e.target.value;document.getElementById('splatRadius').value=mesh.range+' m';};
+ document.getElementById('splatFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>640000)throw Error('File too large: maximum 640 KB / 20,000 splats.');const ps=parseSplat(await file.arrayBuffer());install(ps,file.name);}catch(err){document.getElementById('splatStatus').textContent=err.message;}e.target.value='';};
+ document.getElementById('splatSample').onclick=()=>{const buf=new ArrayBuffer(synthetic.length*32),v=new DataView(buf);synthetic.forEach((p,i)=>{let o=i*32;[p.x,p.y,p.z,...p.s].forEach((n,j)=>v.setFloat32(o+j*4,n,true));p.c.forEach((n,j)=>v.setUint8(o+24+j,n));[255,128,128,128].forEach((n,j)=>v.setUint8(o+28+j,n));});const url=URL.createObjectURL(new Blob([buf])),a=document.createElement('a');a.href=url;a.download='exowatt-site.splat';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+ cv.onpointerdown=e=>{drag=[e.clientX,e.clientY];cv.setPointerCapture(e.pointerId);};cv.onpointermove=e=>{if(!drag)return;yaw+=(e.clientX-drag[0])*.008;pitch=Math.max(.2,Math.min(1.3,pitch+(e.clientY-drag[1])*.006));drag=[e.clientX,e.clientY];};cv.onpointerup=cv.onpointercancel=()=>drag=null;cv.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(.5,Math.min(4,zoom*Math.exp(-e.deltaY*.001)));},{passive:false});
+ draw();
+}
+
 </script>
 <template id="font-license-notices">Copyright 2018 The Manrope Project Authors (https://github.com/googlefonts/manrope)
 
