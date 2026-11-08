@@ -1,5 +1,19 @@
 [
   {
+    "id": "v18",
+    "name": "v18 - Robot names and link error",
+    "file": "v18.html",
+    "sha256": "8e9c2c44a3b3ce4067b13961b07bbdf69240cc42d904446d5f96503fdea63b51",
+    "created": "Bundled November 7, 2026"
+  },
+  {
+    "id": "v17",
+    "name": "v17 - Black and orange workspace",
+    "file": "v17.html",
+    "sha256": "0dd65649e70cd78e293acb38d9ef28ff6ece53c10c9d8ebd91006f4ebcee45b3",
+    "created": "Bundled November 7, 2026"
+  },
+  {
     "id": "v10",
     "name": "v10 \u00b7 Network comparison",
     "file": "v10.html",
