@@ -1,6 +1,13 @@
 [
   {
     "id": "v22",
+    "name": "Allsun v23 - AllSun branding",
+    "file": "v23.html",
+    "sha256": "f506d5b6437f63e74d6f3b77c2e78d9c39db870547deb4cc5078d554c2e144a0",
+    "created": "Bundled November 7, 2026"
+  },
+  {
+    "id": "v22",
     "name": "Allsun v22 - Corner horns and perimeter flee",
     "file": "v22.html",
     "sha256": "05cbf41b8d283f6fce9a4ef2a052119ddbebad317f0d40cb9362fa7ed0c0ed8e",
