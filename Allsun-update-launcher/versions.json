@@ -1,5 +1,12 @@
 [
   {
+    "id": "v21",
+    "name": "Allsun v21 - Simpler stress test",
+    "file": "v21.html",
+    "sha256": "a3eb9bbceeec59f2cfd6d322b9f786aa15f2ab7b443c1bef8f93d1c32c4d8542",
+    "created": "Bundled November 7, 2026"
+  },
+  {
     "id": "v20",
     "name": "Allsun v20 - Custom sun identity",
     "file": "v20.html",
