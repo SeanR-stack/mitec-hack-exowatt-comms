@@ -1,0 +1,23 @@
+[
+  {
+    "id": "v10",
+    "name": "v10 \u00b7 Network comparison",
+    "file": "v10.html",
+    "sha256": "ddd94c799174b20e6d67097ca23cfbf9f9875eb0de667aff1889bccceb84af03",
+    "created": "Bundled November 7, 2026"
+  },
+  {
+    "id": "v9",
+    "name": "v9 \u00b7 Whole-array map",
+    "file": "v9.html",
+    "sha256": "33d6fc76d280303b385f5b2e60bfc0d69cca5046edd07cb2f3fa671d59f6e822",
+    "created": "Bundled November 7, 2026"
+  },
+  {
+    "id": "v8",
+    "name": "v8 \u00b7 Survey baseline",
+    "file": "v8.html",
+    "sha256": "1b29f00424fcb68e29bb9731c68bb219baadde9b23e2eeac4e0fb05347e5afcb",
+    "created": "Bundled November 7, 2026"
+  }
+]
