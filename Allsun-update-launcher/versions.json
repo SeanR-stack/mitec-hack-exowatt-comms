@@ -1,5 +1,12 @@
 [
   {
+    "id": "v22",
+    "name": "Allsun v22 - Corner horns and perimeter flee",
+    "file": "v22.html",
+    "sha256": "05cbf41b8d283f6fce9a4ef2a052119ddbebad317f0d40cb9362fa7ed0c0ed8e",
+    "created": "Bundled November 7, 2026"
+  },
+  {
     "id": "v21",
     "name": "Allsun v21 - Simpler stress test",
     "file": "v21.html",
