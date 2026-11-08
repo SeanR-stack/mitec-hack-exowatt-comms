@@ -1,5 +1,19 @@
 [
   {
+    "id": "v20",
+    "name": "Allsun v20 - Custom sun identity",
+    "file": "v20.html",
+    "sha256": "7f5b267f2320b747d6f720ef9ca5dbabb1250419a46ffda91e4e1c78bd6da980",
+    "created": "Bundled November 7, 2026"
+  },
+  {
+    "id": "v19",
+    "name": "allsun v19 - Drone failure and response",
+    "file": "v19.html",
+    "sha256": "9e8ba53c7a6d53aa2690514ccad949da1d5bc410d483212f74ed4a9148f7156a",
+    "created": "Bundled November 7, 2026"
+  },
+  {
     "id": "v18",
     "name": "v18 - Robot names and link error",
     "file": "v18.html",

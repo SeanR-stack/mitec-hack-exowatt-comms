@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SiteLink local version library. Python 3.9+, standard library only."""
+"""allsun local version library. Python 3.9+, standard library only."""
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
@@ -48,7 +48,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.respond('Not found', 'text/plain', 404)
     def do_POST(self):
         origin = 'http://127.0.0.1:' + str(self.server.server_port)
-        if not self.host_ok() or self.headers.get('Origin') != origin or self.headers.get('X-SiteLink-Token') != TOKEN:
+        if not self.host_ok() or self.headers.get('Origin') != origin or self.headers.get('X-allsun-Token') != TOKEN:
             return self.respond(json.dumps({'error':'Request not allowed'}), status=403)
         if self.path != '/api/import': return self.respond('{}', status=404)
         try:
@@ -87,7 +87,7 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == '__main__':
     server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
     url = 'http://127.0.0.1:' + str(server.server_port)
-    print('SiteLink version library: ' + url, flush=True)
+    print('allsun version library: ' + url, flush=True)
     print('Keep this window open. Press Ctrl+C to stop. Stored builds stay in this folder.', flush=True)
     if '--no-browser' not in sys.argv: webbrowser.open(url)
     try: server.serve_forever()

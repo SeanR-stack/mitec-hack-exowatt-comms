@@ -1,3 +1,13 @@
+# Allsun - current launcher
+
+The newest Allsun app is in [`Allsun-update-launcher`](Allsun-update-launcher/). Open that folder in VS Code and follow its [run instructions](Allsun-update-launcher/README.md). Run `python3 launcher.py` (macOS/Linux) or `py -3 launcher.py` (Windows), then launch v20 from the local library. Python 3.9+ is required, with no packages to install.
+
+v20 adds the custom sun identity. v19 adds a scripted drone failure, heartbeat detection and survey-route takeover by the second drone. Earlier builds remain selectable in the library. This is a local prototype, not measured radio/hardware behavior. The brief asks for coordination through dropped connections; the particular survey-takeover sequence is our design choice.
+
+The old `SiteLink-update-launcher` folder has been renamed to `Allsun-update-launcher`; its historical versions remain in `builds/` and earlier commits. The repository-root `index.html`, data and tests below remain the earlier teammate prototype, unchanged. The notes below describe that earlier root app, not v20.
+
+---
+
 # SiteLink offline prototype
 
 A single-file site-manager demo for the MIT Energy & Climate Hack Exowatt challenge. All machines, sensors, connections and command responses are simulated on one device. This is an unofficial hackathon project, not affiliated with Exowatt.
