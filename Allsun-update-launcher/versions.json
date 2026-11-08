@@ -1,5 +1,12 @@
 [
   {
+    "id": "v24",
+    "name": "Allsun v24 - Three-tier compare",
+    "file": "v24.html",
+    "sha256": "11bb52db82019f4b6e5c3be3dd5dd956f0296a0305b087f78a2a5295b25ba9b4",
+    "created": "Bundled November 7, 2026"
+  },
+  {
     "id": "v23",
     "name": "Allsun v23 - AllSun branding",
     "file": "v23.html",
